@@ -1,0 +1,213 @@
+Model Training: 
+import tensorflow 
+from tensorflow.keras.preprocessing.image import ImageDataGenerator 
+import os 
+from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten , BatchNormalization 
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, MaxPool2D 
+from tensorflow.keras.models import Sequential 
+from tensorflow.keras.optimizers import Adam 
+#Data Loading 
+datagen = ImageDataGenerator( 
+    rescale=1./255, 
+    validation_split=0.20 
+) 
+base_dir = 'Preprocessed' 
+data_train = datagen.flow_from_directory( 
+
+    base_dir, 
+    target_size=(480, 640), 
+    batch_size=4, 
+    class_mode='sparse', 
+    color_mode='grayscale', 
+    subset='training' 
+) 
+data_val = datagen.flow_from_directory( 
+    base_dir, 
+    target_size=(480, 640), 
+    batch_size=4, 
+    class_mode='sparse', 
+    color_mode='grayscale', 
+    subset='validation' 
+) 
+#Classes 
+classes = data_train.class_indices 
+#Model Building 
+input_shape = (480, 640, 1) 
+model = Sequential() 
+model.add(Conv2D(32,kernel_size=(3,3),padding='valid',activation='relu',input_shape=input_sh
+ ape)) 
+model.add(BatchNormalization()) 
+model.add(MaxPooling2D(pool_size=(2,2),strides=2,padding='valid')) 
+model.add(Conv2D(64,kernel_size=(3,3),padding='valid',activation='relu')) 
+model.add(BatchNormalization()) 
+model.add(MaxPooling2D(pool_size=(2,2),strides=2,padding='valid')) 
+model.add(Conv2D(128,kernel_size=(3,3),padding='valid',activation='relu')) 
+model.add(BatchNormalization()) 
+model.add(MaxPooling2D(pool_size=(2,2),strides=2,padding='valid')) 
+model.add(Conv2D(256,kernel_size=(3,3),padding='valid',activation='relu')) 
+model.add(BatchNormalization()) 
+model.add(MaxPooling2D(pool_size=(2,2),strides=2,padding='valid')) 
+model.add(Conv2D(512,kernel_size=(3,3),padding='valid',activation='relu')) 
+model.add(BatchNormalization()) 
+model.add(MaxPooling2D(pool_size=(2,2),strides=2,padding='valid')) 
+model.add(Flatten()) 
+model.add(Dense(128,activation='relu')) 
+model.add(Dropout(0.1)) 
+model.add(Dense(64,activation='relu')) 
+model.add(Dropout(0.1)) 
+model.add(Dense(len(classes),activation='softmax')) 
+model.summary() 
+#Model Compilation 
+c_opt = Adam(learning_rate = 0.0001) 
+model.compile(optimizer=c_opt, 
+              loss='sparse_categorical_crossentropy', 
+              metrics=['accuracy']) 
+#Model Fitting 
+epochs = 20 
+history = model.fit( 
+  data_train, 
+  validation_data=data_val, 
+  epochs=epochs 
+) 
+#Model Evaluation 
+model.evaluate(data_val) 
+#Model Saving 
+model.save('iris.h5') 
+Prediction: 
+import tensorflow 
+import cv2 
+
+from tensorflow.keras.models import load_model 
+import cv2 
+import numpy as np 
+global model 
+model = load_model('iris.h5') 
+def make_prediction(img_path): 
+    image = cv2.imread(rf'{img_path}',0) 
+    new_img = cv2.convertScaleAbs(image, alpha=1.2, beta=10) 
+    blurred_img = cv2.GaussianBlur(new_img, (0, 0), 3) 
+    img_sharpened = cv2.addWeighted(new_img, 1.7, blurred_img, -0.9, 0) 
+    img = img_sharpened.reshape(1,480,640,1) 
+    res = model.predict(img) 
+    print(res) 
+    if res.argmax() == 0: 
+        return res,'John' 
+    elif res.argmax() == 1: 
+        return res,'Mike' 
+    elif res.argmax() == 2: 
+        return res,'Person_3' 
+    elif res.argmax() == 3: 
+        return res,'Person_4' 
+
+    elif res.argmax() == 4: 
+        return res,'Person_5' 
+def preprocess(img): 
+    img = cv2.imread(rf'{img}') 
+    kernel = np.array([[0, -1, 0], 
+                  [-1, 5.1, -1], 
+                  [0, -1, 0]]) 
+    img_sharpened = cv2.filter2D(img,-1,kernel)  
+    return img_sharpened 
+def segmentation(img): 
+    img = cv2.imread(rf'{img}', cv2.IMREAD_GRAYSCALE) 
+    edges = cv2.Canny(img, 30, 150) 
+    return edges 
+Final GUI Interface: 
+from tkinter import * 
+import tkinter.filedialog 
+import tkinter.messagebox as tmsg 
+from PIL import Image 
+from PIL import ImageTk 
+import cv2 
+from prediction import make_prediction,preprocess,segmentation 
+def print_path(): 
+    global f 
+    f = tkinter.filedialog.askopenfilename( 
+        parent=root, 
+        initialdir='', 
+        title='Select file', 
+        filetypes=[('jpg image', '.jpg')] 
+    ) 
+    img1 = cv2.imread(f) 
+    img1 = cv2.resize(img1,(512,512)) 
+    newimg = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB) 
+    img = Image.fromarray(newimg) 
+    imgtk = ImageTk.PhotoImage(image=img) 
+    x.imgtk = imgtk 
+    x.configure(image=imgtk) 
+def segment(): 
+    img_segmented = segmentation(rf'{f}') 
+    img_segmented= cv2.resize(img_segmented,(512,512)) 
+    img = Image.fromarray(cv2.cvtColor(img_segmented, cv2.COLOR_BGR2RGB)) 
+    imgtk = ImageTk.PhotoImage(image=img) 
+    y.imgtk = imgtk 
+    y.configure(image=imgtk) 
+def img_preprocess(): 
+    img_preprocess = preprocess(rf'{f}') 
+    img_preprocess = cv2.resize(img_preprocess,(512,512)) 
+    img = Image.fromarray(cv2.cvtColor(img_preprocess, cv2.COLOR_BGR2RGB)) 
+    imgtk = ImageTk.PhotoImage(image=img) 
+    y.imgtk = imgtk 
+    y.configure(image=imgtk) 
+def login_page(person_detected): 
+    login_window = Tk() 
+    login_window.geometry("800x600") 
+    login_window.title("Iris Detection/Login") 
+    username_label = Label(login_window, text="Username:") 
+    username_label.pack(pady=5) 
+    username_entry = Entry(login_window) 
+    username_entry.pack(pady=5) 
+    password_label = Label(login_window, text="Password:") 
+    password_label.pack(pady=5) 
+    password_entry = Entry(login_window, show="*") 
+    password_entry.pack(pady=5) 
+    def validate_login(): 
+        if username_entry.get() == "admin" and password_entry.get() == "admin": 
+            tmsg.showinfo("Login", f"login successful! Welcome {person_detected}") 
+            login_window.destroy() 
+            root.deiconify() 
+        else: 
+            tmsg.showerror("Login Failed", "Invalid username or password") 
+    login_button = Button(login_window, text="Login", command=validate_login) 
+    login_button.pack(pady=10) 
+    login_window.mainloop() 
+def prediction(): 
+    res, person_detected = make_prediction(rf'{f}') 
+    tmsg.showinfo("User Detected", f"{person_detected} is detected! Please Login") 
+    login_page(person_detected) 
+root = Tk() 
+root.geometry("1200x800") 
+root.title("Iris Detection") 
+root.resizable(0, 0) 
+MF = Frame(root, bd=8, bg="lightgray", relief=GROOVE) 
+MF.place(x=0, y=0, height=50, width=1200) 
+menu_label = Label(MF, text="Iris Detection", font=("times new roman", 20, "bold"), 
+bg="lightgray", fg="black", pady=0) 
+menu_label.pack(side=TOP, fill="x") 
+# Create a frame for buttons 
+button_frame = Frame(root) 
+button_frame.grid(row=1, column=0, pady=10) 
+# "Select Image" button 
+b1 = Button(button_frame, font=("times new roman", 20, "bold"), text='Select Image', 
+command=print_path) 
+b1.grid(row=0, column=0, padx=10) 
+# "Preprocess" button 
+b2 = Button(button_frame, font=("times new roman", 20, "bold"), text='Preprocess', 
+command=img_preprocess) 
+b2.grid(row=0, column=1, padx=10) 
+# "Segmentation" button 
+b2 = Button(button_frame, font=("times new roman", 20, "bold"), text='Segmentation', 
+command= segment) 
+b2.grid(row=0, column=2, padx=10) 
+# "Predict" button 
+b2 = Button(button_frame, font=("times new roman", 20, "bold"), text='Predict', 
+command=prediction) 
+b2.grid(row=0, column=3, padx=10) 
+# Create a frame for displaying images 
+image_frame = Frame(root) 
+image_frame.grid(row=0, column=0, padx=50, pady=50) 
+x = Label(image_frame, image=None) 
+x.grid(row=0, column=0, padx=10) 
+y = Label(image_frame, image=None) 
+y.grid(row=0, column=1, padx=10) 
+root.mainloop() 
